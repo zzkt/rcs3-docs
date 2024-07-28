@@ -1,0 +1,5 @@
+# -*- mode: org;  coding: utf-8; -*-
+#+title:SuperCollider tutorial
+#+author: Nick Collins
+
+via https://composerprogrammer.com/teaching/supercollider/sctutorial/tutorial.html

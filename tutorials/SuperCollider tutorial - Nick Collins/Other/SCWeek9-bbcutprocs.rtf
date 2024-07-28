@@ -1,0 +1,73 @@
+{\rtf1\mac\ansicpg10000\cocoartf102
+{\fonttbl\f0\fnil\fcharset77 Monaco;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue191;\red96\green96\blue96;\red191\green0\blue0;
+}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\f0\fs48 \cf0 BBCut Continued - Procs\
+\
+A BBCutProc (BBCut Procedure) is an algorithm used to reassemble your cuts. So far we have been using the default proc, BBCutProc11, but there are a huge number of different procs which you can use. Each one should have its own helpfile. For a full list see the BBCutLibrary helpfile. Lets look at a couple - SQPusher1 and WarpCutProc1 - you can check out the others in your own time.\
+\
+SQPusher1:\
+This procedure is derived from an analysis of the work of Squarepusher (aka Tom Jenkinson). It always works in 4/4 with one bar phrases, and its arguments are:\
+activity - chance of semiquavers rather than quavers\
+fillfreq - by default fills occur every fourth bar, but this can be changed with this parameter\
+fillscramble - the chance of a fill being scrambled\
+sqweights - the chance of a semiquaver bias at each quaver of the bar\
+bpsd - beats per sub-division\
+\
+Lets take a look at this using soundfile input:\
+(	\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf2 var\cf0  f, bbcut1, synthsf, procedure;\
+f = \cf2 SF3\cf0 (\cf3 "beats/sqpush1.wav"\cf0 , 16);\
+synthsf = \cf2 BBCutSynthSF\cf0 .new(f, 0.4);\
+procedure = \cf2 SQPusher1\cf0 .new(0.75); \cf4 //75% chance of semiquavers\cf0 \
+bbcut1 = \cf2 BBCut\cf0 .new(synthsf, procedure);\
+bbcut1.tempo_(3.5).go;	\
+\cf4 // start the bbcut with a tempo of 3.5 beats per second\cf0 \
+)\
+\
+And lets make it more interesting by randomising some arguments:\
+s = Server.local;\
+s.boot;\
+(	\
+\cf2 var\cf0  f, bbcut1, synthsf, procedure;\
+f = \cf2 SF3\cf0 (\cf3 "beats/sqpush1.wav"\cf0 , 16);\
+synthsf = \cf2 BBCutSynthSF\cf0 .new(f, 0.4);\
+procedure = \cf2 SQPusher1\cf0 .new(\
+								\{[1.0,0.8,0.75,0.3].wchoose([0.2,0.1,0.4,0.3])\},\
+								\{rand(3,7)\},\
+								\{[1.0,0.75,0.5,0.25,0.0].wchoose([0.1,0.2,0.3,0.3,0.1])\},\
+								[0.0,0.8,0.4,0.2,0.7,0.1,0.9,0.6]\
+								); \
+bbcut1 = \cf2 BBCut\cf0 .new(synthsf, procedure);\
+bbcut1.tempo_(3.5).go;	\
+\cf4 // start the bbcut with a tempo of 3.5 beats per second\cf0 \
+)\
+\
+WarpCutProc1:\
+This procedure performs cuts in the style of Aphex Twin etc. It deals with blocks - you specify a block size and then probabilities that the block will be stated in some simple form or as a roll (timed evenly or accelerating/decelerating). Its arguments are:\
+blocksizefunc - a function to return the next block size\
+rollfunc - a function returning the number of cuts to subdivide the block into during a roll\
+probs - an array of three probabilities: Probability of simple statement, probability of even roll and probability of accelerando rather than decelerando\
+phraselength - next length of phrase (in beats)\
+accel - a parameter to control the acceleration of the roll. Must be between 0.0 & 1.0.\
+bpsd - beats per sub-division\
+\
+(	\
+\cf2 var\cf0  f, bbcut1, synthsf, procedure;\
+f = \cf2 SF3\cf0 (\cf3 "beats/sacre1.wav"\cf0 , 16);\
+synthsf = \cf2 BBCutSynthSF\cf0 .new(f, 0.4);\
+procedure = \cf2 WarpCutProc1\cf0 .new(\
+			\{[1,2,3,4,5,6].wchoose([0.1,0.2,0.1,0.1,0.3,0.2])\},\
+			\{[9,19,29].choose\},\
+			[0.3,0.3,0.4],\
+			100,\
+			\{0.8+(0.15.rand)\}\
+								); \
+bbcut1 = \cf2 BBCut\cf0 .new(synthsf, procedure);\
+bbcut1.tempo_(3.5).go;	\
+\cf4 // start the bbcut with a tempo of 3.5 beats per second\cf0 \
+)\
+}

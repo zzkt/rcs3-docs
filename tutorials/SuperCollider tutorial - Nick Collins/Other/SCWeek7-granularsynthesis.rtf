@@ -1,0 +1,295 @@
+{\rtf1\mac\ansicpg10000\cocoartf102
+{\fonttbl\f0\fnil\fcharset77 Monaco;}
+{\colortbl;\red255\green255\blue255;\red191\green0\blue0;\red0\green0\blue0;\red0\green0\blue191;
+\red96\green96\blue96;}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\f0\fs42 \cf2 // First steps - a patch which will load a file into a buffer and let you \cf3 \
+\cf2 // play through it at different rate
+\fs30 \cf3 \
+
+\fs40 s = \cf4 Server\cf3 .local;\
+s.boot;
+\fs30 \
+
+\fs40 (\
+\cf4 var\cf3  b, w, serverbut, openDialog, playbut, ratesl;\
+b = \cf4 Buffer\cf3 .read(s, \cf5 "sounds/sqpush5.wav"\cf3 );\
+\cf2 // A synthdef - using PlayBuf to play the contents of the buffer "b"\cf3 \
+\cf4 SynthDef\cf3 (\cf5 "fplayer"\cf3 , \{ \cf4 arg\cf3  rate;\
+\cf4 var\cf3  file;\
+file = \cf4 PlayBuf\cf3 .ar(2, b.bufnum, rate, loop:1);\
+\cf4 Out\cf3 .ar(0, file);\
+\}).writeDefFile;\
+s.sendSynthDef(\cf5 "fplayer"\cf3 );\
+\cf2 // Create a window. When it is closed, the buffer b will be freed\cf3 \
+w = \cf4 SCWindow\cf3 (\cf5 "Granular Synthesis"\cf3 , \cf4 Rect\cf3 (100, 400, 600, 600));\
+w.onClose = \{b.free\};\
+w.front;\
+\cf2 // A button to bring up a file dialog. Whenever a file is selected, buffer\cf3 \
+\cf2 // b is cleared and the new file is read into it.\cf3 \
+openDialog = \cf4 SCButton\cf3 (w, \cf4 Rect\cf3 (10, 60, 100, 25));\
+openDialog.states = [\
+	[\cf5 "Open File"\cf3 , \cf4 Color\cf3 .black, \cf4 Color\cf3 .new(0.8,0.8,0.8)]\
+];\
+openDialog.action = \{\
+	\cf4 CocoaDialog\cf3 .getPaths(\{ \cf4 arg\cf3  paths;\
+		if (b != \cf4 nil\cf3 , \{b.free\});\
+		b = \cf4 Buffer\cf3 .read(s, paths.at(0));\
+	\},\{\
+		\cf5 "Cancelled"\cf3 .postln;\
+	\});\
+\};\
+\cf2 // A button to play back the contents of the buffer.\cf3 \
+playbut = \cf4 SCButton\cf3 (w, \cf4 Rect\cf3 (10, 90, 100, 25));\
+playbut.states = [\
+	[\cf5 "Play"\cf3 , \cf4 Color\cf3 .black, \cf4 Color\cf3 .new(0.8,0.8,0.8)],\
+	[\cf5 "Stop"\cf3 , \cf4 Color\cf3 .black, \cf4 Color\cf3 .new(0.8,0.8,0.8)],\
+];\
+playbut.action = \{\
+	if (playbut.value ==1, \{\
+			y = \cf4 Synth\cf3 (\cf5 "fplayer"\cf3 );\
+			y.set(\cf5 "rate"\cf3 , (8*ratesl.value)-4);\
+		\},\{\
+			y.free;\
+		\});\
+\};\
+\cf2 // A slider to determine the rate of playback. It will produce values\cf3 \
+\cf2 // between +/- 4 - remember a minus value will play through the file backwards\cf3 \
+ratesl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (10, 120, 25, 100));\
+ratesl.value = 0.5;\
+ratesl.action = \{\
+		y.set(\cf5 "rate"\cf3 , (8*ratesl.value)-4);\
+\};\
+)\
+\
+\cf2 // So for granular synthesis, we would control the various parameters in the \cf3 \
+\cf2 // following way:\cf3 \
+\cf2 //\cf3 \
+\cf2 // Grain size: Create an envelope - the envelope duration will then be the grain \cf3 \
+\cf2 // size\cf3 \
+\cf2 // Grain amplitude: Change the maximum value of the envelope mentioned above\cf3 \
+\cf2 // Grain amplitude dispersion: Add a random factor to the above amplitude\cf3 \
+\cf2 // Pitch: Change the rate value of the PlayBuf\cf3 \
+\cf2 // Pitch Dispersion: Add a random factor to the Pitch value\cf3 \
+\cf2 // Density: Use some sort of signal (e.g. Pulse) to trigger the envelope - if you \cf3 \
+\cf2 // use Pulse, then a higher frequency will generate a higher density, a lower \cf3 \
+\cf2 // frequency a lower density.\cf3 \
+\cf2 // Time Dispersion: Add a random factor to the frequency of your Pulse trigger \cf3 \
+\cf2 // signal\cf3 \
+\cf2 // No. of Grains: Create/destroy more instances of the synth\cf3 \
+\cf2 //\cf3 \
+\cf2 // Step 1: Creating an envelope\cf3 \
+\cf2 // multiply the output of the PlayBuf by an instance of an EnvGen\cf3 \
+\cf2 // e.g:\cf3 \
+\cf2 //\cf3 \
+\cf2 // env = EnvGen.kr(Env.new([0,1,1,0], [1,1,1]), trigger, grainamplitude, 0, \cf3 \
+\cf2 // grainsize);\cf3 \
+\cf2 //\cf3 \
+\cf2 // So, how do we work out the trigger, grainamplitude and grainsize?\cf3 \
+\cf2 // \cf3 \
+\cf2 // Trigger: we can use a pulse wave - the frequency will determine the \cf3 \
+\cf2 // grain density\cf3 \
+\cf2 // \cf3 \
+\cf2 // trigger = LFPulse.kr(density+timedispersion)\cf3 \
+\cf2 // \cf3 \
+\cf2 // For grainamplitude, we can generate a random value between Grain Amplitude - \cf3 \
+\cf2 // Grain Amplitude Dispersion and Grain Amplitude + Grain Amplitude Dispersion. \cf3 \
+\cf2 // This can be done using a TRand ( a triggered random number generator). You \cf3 \
+\cf2 // supply a low value, a high value and a trigger. A random number between lo and \cf3 \
+\cf2 // hi will be generated every time the trigger moves from <=0 to >0\cf3 \
+\cf2 // \cf3 \
+\cf2 // grainsize = Grain Size + random factor if wanted\cf3 \
+ \
+(\
+\cf4 var\cf3  s, b, w, serverbut, openDialog, playbut, ratesl;\
+\cf4 var\cf3  densl, timedispsl, grainampsl, grainampdispsl, grainsizesl;\
+s = \cf4 Server\cf3 .local;\
+b = \cf4 Buffer\cf3 .read(s, \cf5 "sounds/break2.wav"\cf3 );\
+\cf2 // A synthdef - using PlayBuf to play the contents of the buffer "b"\cf3 \
+\cf4 SynthDef\cf3 (\cf5 "fplayer"\cf3 , \{ \cf4 arg\cf3  rate, density=1, timedispersion=0, grainamp=1, grainampdisp=0, grainsize=1;\
+\cf4 var\cf3  file, env, trigger, grainamplitude;\
+trigger = \cf4 LFPulse\cf3 .kr(density+(\cf4 LFNoise1\cf3 .kr(10, 0.5, 0.5) * timedispersion));\
+grainamplitude = \cf4 TRand\cf3 .kr(grainamp-grainampdisp, grainamp+grainampdisp, trigger);\
+env = \cf4 EnvGen\cf3 .kr(\cf4 Env\cf3 .new([0,1,1,0], [1,1,1]), trigger, grainamplitude, 0, grainsize);\
+file = \cf4 PlayBuf\cf3 .ar(2, b.bufnum, rate, loop:1);\
+\cf4 Out\cf3 .ar(0, file*env);\
+\}).writeDefFile;\
+s.sendSynthDef(\cf5 "fplayer"\cf3 );\
+\cf2 // Create a window. When it is closed, the buffer b will be freed\cf3 \
+w = \cf4 SCWindow\cf3 (\cf5 "Granular Synthesis"\cf3 , \cf4 Rect\cf3 (100, 400, 600, 600));\
+w.onClose = \{b.free\};\
+w.front;\
+\cf2 // A button to bring up a file dialog. Whenever a file is selected, buffer\cf3 \
+\cf2 // b is cleared and the new file is read into it.\cf3 \
+openDialog = \cf4 SCButton\cf3 (w, \cf4 Rect\cf3 (10, 60, 100, 25));\
+openDialog.states = [\
+	[\cf5 "Open File"\cf3 , \cf4 Color\cf3 .black, \cf4 Color\cf3 .new(0.8,0.8,0.8)]\
+];\
+openDialog.action = \{\
+	\cf4 CocoaDialog\cf3 .getPaths(\{ \cf4 arg\cf3  paths;\
+		if (b != \cf4 nil\cf3 , \{b.free\});\
+		b = \cf4 Buffer\cf3 .read(s, paths.at(0));\
+	\},\{\
+		\cf5 "Cancelled"\cf3 .postln;\
+	\});\
+\};\
+\cf2 // A button to play back the contents of the buffer. \cf3 \
+playbut = \cf4 SCButton\cf3 (w, \cf4 Rect\cf3 (10, 90, 100, 25));\
+playbut.states = [\
+	[\cf5 "Play"\cf3 , \cf4 Color\cf3 .black, \cf4 Color\cf3 .new(0.8,0.8,0.8)],\
+	[\cf5 "Stop"\cf3 , \cf4 Color\cf3 .black, \cf4 Color\cf3 .new(0.8,0.8,0.8)],\
+];\
+playbut.action = \{\
+	if (playbut.value ==1, \{\
+			y = \cf4 Synth\cf3 (\cf5 "fplayer"\cf3 );\
+			y.set(\cf5 "rate"\cf3 , (8*ratesl.value)-4);\
+		\},\{\
+			y.free;\
+		\});\
+\};\
+\cf2 // A slider to determine the rate of playback. It will produce values\cf3 \
+\cf2 // between +/- 4 - remember a minus value will play through the file backwards\cf3 \
+ratesl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (10, 120, 25, 300));\
+ratesl.value = 0.5;\
+ratesl.action = \{\
+		y.set(\cf5 "rate"\cf3 , (8*ratesl.value)-4);\
+\};\
+\cf2 // The number set here will be the grain density\cf3 \
+densl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (40, 120, 25, 300));\
+densl.action = \{\
+		y.set(\cf5 "density"\cf3 , 40*densl.value); \};\
+\cf2 //The number set here will be the maximum deviation from the density\cf3 \
+timedispsl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (70, 120, 25, 300));\
+timedispsl.action = \{\
+		y.set(\cf5 "timedispersion"\cf3 , 0.2*timedispsl.value); \
+\};\
+\cf2 // This will determine the grain amplitude\cf3 \
+grainampsl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (100, 120, 25, 300));\
+grainampsl.action = \{\
+		y.set(\cf5 "grainamp"\cf3 , grainampsl.value);\
+\};\
+\cf2 // and this will determine the random deviation from the grain amplitude \cf3 \
+grainampdispsl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (130, 120, 25, 300));\
+grainampdispsl.action = \{\
+		y.set(\cf5 "grainampdisp"\cf3 , 0.5*grainampdispsl.value);\
+\};\
+\cf2 // this will set the grain length\cf3 \
+grainsizesl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (160, 120, 25, 300));\
+grainsizesl.action = \{\
+		y.set(\cf5 "grainsize"\cf3 , 0.25*grainsizesl.value);\
+\};\
+)\
+\
+\cf2 // So now we have very basic granular synthesis, using only one grain at a time. // What we want to do now is find a way of adding and killing new instances of \cf3 \
+\cf2 // the Synth. To do this, we add and remove instances of the Synth to a group. \cf3 \
+\cf2 // Now we use the .set command on the group instead of individual synths.\cf3 \
+\cf2 // To do this, we can use the following code:\cf3 \
+\cf4 var\cf3  grainarray;\
+grainarray = \cf4 Array\cf3 .new; \cf2 // an array to hold our synths\cf3 \
+\cf2 // create an add and remove button. The add button action will do\cf3 \
+grainarray = grainarray.add(\cf4 Synth\cf3 (\cf5 "fplayer"\cf3 , [array of arguments], groupname));\
+\cf2 // i.e. create a new instance of the Synth in group "groupname" and add it to the \cf3 \
+\cf2 // array "grainarray"\cf3 \
+\cf2 //\cf3 \
+\cf2 // The remove button action will do\cf3 \
+grainarray.pop.free;\
+\cf2 // This will remove and return the last item of the array grainarray and perform \cf3 \
+\cf2 // the method .free on it\cf3 \
+\
+\cf2 // ****************Full Patch**********************\cf3 \
+\cf2 // The server needs to be booted before you execute the rest of the code\cf3 \
+\cf2 // otherwise it doesn't recognise the buffer, group or array\cf3 \
+s = \cf4 Server\cf3 .local;\
+s.boot;\
+(\
+\cf4 var\cf3  s, b, w, serverbut, openDialog, addbut, removebut, ratesl;\
+\cf4 var\cf3  densl, timedispsl, grainampsl, grainampdispsl, grainsizesl;\
+\cf4 var\cf3  grainarray, g;\
+s = \cf4 Server\cf3 .local;\
+b = \cf4 Buffer\cf3 .read(s, \cf5 "sounds/break2.wav"\cf3 );\
+grainarray = \cf4 Array\cf3 .new;\
+g = \cf4 Group\cf3 .new; \cf2 // creates a new group\cf3 \
+\cf4 SynthDef\cf3 (\cf5 "fplayer"\cf3 , \{ \cf4 arg\cf3  rate, density=1, timedispersion=0, grainamp=1, grainampdisp=0, grainsize=1;\
+\cf4 var\cf3  file, env, trigger, grainamplitude;\
+trigger = \cf4 LFPulse\cf3 .kr(density+(\cf4 LFNoise1\cf3 .kr(10, 0.5, 0.5) * timedispersion));\
+grainamplitude = \cf4 TRand\cf3 .kr(grainamp-grainampdisp, grainamp+grainampdisp, trigger);\
+env = \cf4 EnvGen\cf3 .kr(\cf4 Env\cf3 .new([0,1,1,0], [1,1,1]), trigger, grainamplitude, 0, grainsize);\
+file = \cf4 PlayBuf\cf3 .ar(2, b.bufnum, rate, loop:1);\
+\cf4 Out\cf3 .ar(0, file*env);\
+\}).writeDefFile;\
+s.sendSynthDef(\cf5 "fplayer"\cf3 );\
+w = \cf4 SCWindow\cf3 (\cf5 "Granular Synthesis"\cf3 , \cf4 Rect\cf3 (100, 400, 600, 600));\
+w.onClose = \{b.free\};\
+w.front;\
+\cf2 // A button to stop the server\cf3 \
+serverbut = \cf4 SCButton\cf3 (w, \cf4 Rect\cf3 (10, 30, 100, 25));\
+serverbut.states = [\
+		[\cf5 "Stop Server"\cf3 , \cf4 Color\cf3 .white, \cf4 Color\cf3 .black],\
+];\
+serverbut.action = \{\
+		s.quit;\
+\};\
+openDialog = \cf4 SCButton\cf3 (w, \cf4 Rect\cf3 (10, 60, 100, 25));\
+openDialog.states = [\
+	[\cf5 "Open File"\cf3 , \cf4 Color\cf3 .black, \cf4 Color\cf3 .new(0.8,0.8,0.8)]\
+];\
+openDialog.action = \{\
+	\cf4 CocoaDialog\cf3 .getPaths(\{ \cf4 arg\cf3  paths;\
+		if (b != \cf4 nil\cf3 , \{b.free\});\
+		b = \cf4 Buffer\cf3 .read(s, paths.at(0));\
+	\},\{\
+		\cf5 "Cancelled"\cf3 .postln;\
+	\});\
+\};\
+\cf2 // a button to add a new grain\cf3 \
+addbut = \cf4 SCButton\cf3 (w, \cf4 Rect\cf3 (10, 90, 100, 25));\
+addbut.states = [\
+	[\cf5 "Add grain"\cf3 , \cf4 Color\cf3 .black, \cf4 Color\cf3 .new(0.8,0.8,0.8)]\
+];\
+addbut.action = \{\
+	grainarray = grainarray.add(\cf4 Synth\cf3 (\cf5 "fplayer"\cf3 , [\
+						\cf5 "rate"\cf3 , (8*ratesl.value)-4,\
+						\cf5 "density"\cf3 , 20*densl.value,\
+						\cf5 "timedispersion"\cf3 , 0.2*timedispsl.value,\
+						\cf5 "grainamp"\cf3 , grainampsl.value,\
+						\cf5 "grainampdisp"\cf3 , 0.5*grainampdispsl.value,\
+						\cf5 "grainsize"\cf3 , 0.5*grainsizesl.value\
+						], g));\
+	\};\
+\cf2 // a button to remove a grain\cf3 \
+removebut = \cf4 SCButton\cf3 (w, \cf4 Rect\cf3 (120, 90, 100, 25));\
+removebut.states = [\
+	[\cf5 "Remove grain"\cf3 , \cf4 Color\cf3 .black, \cf4 Color\cf3 .new(0.8,0.8,0.8)]\
+];\
+removebut.action = \{\
+	grainarray.pop.free;\
+		\};\
+ratesl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (10, 120, 25, 300));\
+ratesl.value = 0.5;\
+ratesl.action = \{\
+		g.set(\cf5 "rate"\cf3 , (8*ratesl.value)-4);\
+\};\
+densl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (40, 120, 25, 300));\
+densl.action = \{\
+		g.set(\cf5 "density"\cf3 , 20*densl.value); \
+\};\
+timedispsl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (70, 120, 25, 300));\
+timedispsl.action = \{\
+		g.set(\cf5 "timedispersion"\cf3 , 0.2*timedispsl.value); \
+\};\
+grainampsl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (100, 120, 25, 300));\
+grainampsl.action = \{\
+		g.set(\cf5 "grainamp"\cf3 , grainampsl.value);\
+\};\
+grainampdispsl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (130, 120, 25, 300));\
+grainampdispsl.action = \{\
+		g.set(\cf5 "grainampdisp"\cf3 , 0.5*grainampdispsl.value);\
+\};\
+grainsizesl = \cf4 SCSlider\cf3 (w, \cf4 Rect\cf3 (160, 120, 25, 300));\
+grainsizesl.action = \{\
+		g.set(\cf5 "grainsize"\cf3 , 0.5*grainsizesl.value);\
+\};\
+)\
+\
+}

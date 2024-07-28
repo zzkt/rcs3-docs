@@ -1,0 +1,134 @@
+{\rtf1\mac\ansicpg10000\cocoartf102
+{\fonttbl\f0\fnil\fcharset77 Monaco;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue191;\red0\green0\blue128;\red96\green96\blue96;
+\red191\green0\blue0;\red0\green115\blue0;}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\f0\fs48 \cf2 BBCut\cf0  - www.sicklincoln.org\
+\
+BBCut is an external library of classes for SuperCollider developed by \cf3 Nic Collins\cf0 . In simplistic terms it is a collection of Ugens which can be used to cut up audio from various sources and rearrange it again in a manner determined by various algorithmic procedures. A BBCut consists of a collection of BBCutSynths which determine the audio input, a BBCutProc which determines how it is pieced together and a TempoClock which provides a time reference for all of this to happen. There are a huge range of synths and procs in the library, all of them well documented. A typical bbcut will look like:\
+\
+\cf2 BBCut\cf0 .new(bbcutsynth, bbcutproc, tempoclock);\
+\
+You can control the bbcut using the .go function. Other instance methods include\
+tempo - get current tempo\
+tempo_ - set current tempo\
+kill - kill the bbcut, releasing all associated synths\
+pause - pause the bbcut - argument 1 for on, 0 for off\
+run - takes boolean input - \cf2 true\cf0  for on, \cf2 false\cf0  for off\
+\
+BBCutSynths:\
+We shall look at 3 different scenarios - input from a soundfile, live audio input (microphone etc.) and input from other sound generating Ugens (SinOsc etc.).\
+\
+Soundfiles:\
+There is an additional class which comes with BBCut called SF3. This class deals with the opening of a soundfile and running it at a synchronised playback speed. If you open up its class definition file, you will see that it is using the concepts we have covered in previous weeks (opening a soundfile, getting information from it, reading it into a buffer, playing it back using playbuf etc.) but it provides a convenient front end for it all. Its arguments are path (relative to the "sounds" directory in your SuperCollider build directory), beats and tempo. Beats refers to the number of beats in the soundfile you are using. If you dont have this information, you can specify the tempo of the soundfile instead, and it will work out the number of beats for you. Generally it is sufficient to only specify the path and beats of a particular file.\
+\
+s = \cf2 Server\cf0 .local;\
+s.boot;\
+f = \cf2 SF3\cf0 (\cf4 "beats/sqpush1.wav"\cf0 , 8); \
+f.play;\
+\
+As you can see, we can play back the file by using the .play method. It also accepts the arguments bus, target, addaction, rate, offset, amp (amplitude), pan and len (length).\
+\
+f.play(rate:2.0);	\cf5 // play at twice the speed\cf0 \
+f.play(rate:0.5);	\cf5 // play at half the speed\cf0 \
+f.play(offset:(f.numFrames)/2);\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf5 // play from half-way through the file\cf0 \
+\
+It is also possible to use the .loop function to loop it - it accepts the same arguments as .play. However, it can fail if you don't specify the target server.\
+\
+f.loop(0, s, \cf6 \\addToHead\cf0 , 0.5); \
+\cf5 // this loops the soundfile on bus 0, server s, at half-speed.\cf0 \
+f.loop(0, s, \cf6 \\addToHead\cf0 , -0.5, f.numFrames-1); \
+\cf5 // same but in reverse\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf0 \
+Now we can play back a soundfile, we can use it in a BBCutSynth. To do so, we use the Ugen BBCutSynthSF. Its arguments are sf, randomoffset, ampfunc, panfunc, pbsfunc, dutycycle, atkprop, relprop, curve and offsetshiftfunc:\
+sf - a reference to an SF3 object\
+randomoffset - the chance of choosing a random offset instead of playing through it from the same place every time\
+ampfunc - a function for determining the amplitude of each cut on playback\
+panfunc - a function for determining the pan postion of each cut - only works on a mono input\
+pbsfunc - a function for determining the playback speed of each cut\
+dutycycle - proportion of the cut duration that it will actually play for - values greater than 1 will mean the cuts will overlap\
+atkprop - proportion of the cut duration to spend on attack envelope\
+relprop - proportion of the cut duration to spend on release envelope\
+curve - curve parameter of the envelope - 0.0 is straight, other values will produce positive or negative curvature\
+offsetshiftfunc - a function to change the offset - range 0.0 to 1.0\
+\
+You can specify as many or as little of these arguments as you like.\
+(\
+\cf2 var\cf0  f, bbcut1;\
+f = \cf2 SF3\cf0 (\cf4 "beats/sqpush1.wav"\cf0 , 12);\
+bbcut1 = \cf2 BBCut\cf0 .new(\cf2 BBCutSynthSF\cf0 .new(f, 0.3));\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf5 // a new bbcut using the SF3 instance "f" with a 30% chance \cf0 \
+\cf5 //of a random offset\cf0 \
+bbcut1.go;	\cf5 // start the bbcut\cf0 \
+)\
+\
+(	\cf5 //loads of arguments\cf0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf2 var\cf0  f, bbcut1, synthsf, prop;\
+f = \cf2 SF3\cf0 (\cf4 "beats/sqpush1.wav"\cf0 , 12);\
+prop = 1;\
+synthsf = \cf2 BBCutSynthSF\cf0 .new(f, 0.4, \
+		\{[1.0,0.1,0.0].wchoose([0.8, 0.1, 0.1])\},									\cf5 //amplitude function\cf0 \
+		\{1.0.rand2\},	\cf5 //pan function\cf0 \
+		\{[0.25, 0.5,1.0].choose\},									\cf5 //playback speed function\cf0 \
+		\{[0.5,1.0].choose\},	\cf5 //dutycycle function\cf0 \
+		\{prop=exprand(0.1,0.9); prop\},									\cf5 //attack proportion\cf0 \
+		\{1.0-prop\},		\cf5 //release proportion\cf0 \
+		\{rrand(-16, 16)\}	\cf5 //curve function\cf0 \
+		);\
+bbcut1 = \cf2 BBCut\cf0 .new(synthsf);\
+bbcut1.tempo_(3.5).go;	\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf5 // start the bbcut with a tempo of 3.5 beats per second\cf0 \
+)\
+\
+Audio input:\
+Live audio input can be accessed using the ugen BBCSAudioIn. Its arguments are:\
+channel - input channel(s) to cut\
+ampfunc - same as BBCutSynthSF\
+panfunc - as above\
+pbsfunc - as above\
+dutycycle - yep, you guessed it\
+atkprop\
+relprop\
+curve\
+offsetshiftfunc\
+buflength - buffer length, defaults to 4 seconds\
+bufbeats - number of beats to treat the buffer as, defaults to 8\
+\
+We can easily adapt the last example we used to use live audio input instead:\
+\
+(	\cf5 //loads of arguments - using audio inputs 1&2\cf0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf2 var\cf0  bbcut1, synthsf, prop;\
+prop = 1;\
+synthsf = \cf2 BBCSAudioIn\cf0 .new([1,2], \
+		\{[1.0,0.1,0.0].wchoose([0.8, 0.1, 0.1])\},									\cf5 //amplitude function\cf0 \
+		\{1.0.rand2\},	\cf5 //pan function\cf0 \
+		\{[0.25,0.5,1.0].choose\},									\cf5 //playback speed function\cf0 \
+		\{[0.5,1.0].choose\},	\cf5 //dutycycle function\cf0 \
+		\{prop=exprand(0.1,0.9); prop\},									\cf5 //attack proportion\cf0 \
+		\{1.0-prop\},		\cf5 //release proportion\cf0 \
+		\{rrand(-16, 16)\}	\cf5 //curve function\cf0 \
+		);\
+bbcut1 = \cf2 BBCut\cf0 .new(synthsf);\
+bbcut1.tempo_(3.5).go;	\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf5 // start the bbcut with a tempo of 3.5 beats per second\cf0 \
+)\
+\
+Other input:\
+This is also done using BBCSAudioIn - for handiness there is the function .newOnBus which works in the same way, but deals with bus numbers instead.\
+\
+\{\cf2 Out\cf0 .ar(4, \cf2 SinOsc\cf0 .ar(440))\}.play  \
+\cf5 // send a sinewave to bus 4\cf0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf2 BBCut\cf0 (\cf2 BBCSAudioIn\cf0 .newOnBus(4)).tempo_(3.2).go; \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+\cf5 \
+}

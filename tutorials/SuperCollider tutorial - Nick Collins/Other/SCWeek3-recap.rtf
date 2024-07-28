@@ -1,0 +1,109 @@
+{\rtf1\mac\ansicpg10000\cocoartf102
+{\fonttbl\f0\fnil\fcharset77 Monaco;}
+{\colortbl;\red255\green255\blue255;\red191\green0\blue0;\red0\green0\blue191;\red96\green96\blue96;
+}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\f0\fs38 \cf2 // From the tutorials: We expanded our fm examples to make them as modular\
+// as possible. We also looked at the Line and Select Ugens\
+//\
+// The "fm" synthdef produces a sine wave and outputs it to a bus specified by\
+// the argument outbus. Its frequency and amplitude in turn can be modulated\
+// by the contents of the busses specified by the arguments inbus1 and inbus2\
+//\
+// The "carrier" synthdef produces either a sine wave or a saw wave, depending\
+// on what value is sent to the index of the Select Ugen, via the argument shape.\
+// The frequency and amplitude of the selected wave can be modulated by the \
+// contents of the busses specified by inbus1 and inbus2\
+//\
+// The "line" synthdef generates a line between the value specified by the\
+// argument start to the value specified by the argument end over the amount\
+// of time specified by the argument time. This is written to the bus specified\
+// by the argument outbus. The line has been assigned a doneAction of 2 - this \
+// means that when the line gets to the end, it will kill the synth which contains\
+// it and free up that node.\
+//\
+// Got that?!?\
+//////////////////////////////////////////////////////////////////////////////////
+\fs14 \cf0 \
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\fs42 \cf0 (\
+\cf3 SynthDef\cf0 (\cf4 "fm"\cf0 , \{ \cf3 arg\cf0  freq=60, amp=1, inbus1=101, inbus2=102, outbus=100;\
+\cf3 var\cf0  sound, in1, in2;\
+in1 = \cf3 In\cf0 .kr(inbus1,1);\
+in2 = \cf3 In\cf0 .kr(inbus2,1);\
+sound = \cf3 SinOsc\cf0 .kr(freq+in1,0,amp+in2);\
+\cf3 Out\cf0 .kr(outbus,sound);\
+\}).writeDefFile;\
+\
+\cf3 SynthDef\cf0 (\cf4 "carrier"\cf0 , \{ \cf3 arg\cf0  freq=100, amp=1, inbus1=100, inbus2=103, shape=0;\
+\cf3 var\cf0  in1, in2, sound1, sound2, sound3;\
+in1 = \cf3 In\cf0 .kr(inbus1,1);\
+in2 = \cf3 In\cf0 .kr(inbus2,1);\
+sound1 = \cf3 SinOsc\cf0 .ar(freq+in1, 0, amp+in2);\
+sound2 = \cf3 Saw\cf0 .ar(freq+in1, (amp+in2)/2);\
+sound3 = \cf3 Select\cf0 .ar(shape, [sound1,sound2]);\
+\cf3 Out\cf0 .ar(0, [sound3,sound3]);\
+\}).writeDefFile;\
+\
+\cf3 SynthDef\cf0 (\cf4 "line"\cf0 , \{ \cf3 arg\cf0  start=30, end=0, time=2, outbus=101;\
+\cf3 var\cf0  line;\
+line = \cf3 Line\cf0 .kr(start, end, time, 1, 0, 2);\
+\cf3 Out\cf0 .kr(outbus, line);\
+\}).writeDefFile;\
+)\
+\
+s = \cf3 Server\cf0 .local;\
+s.boot;\
+\
+(\
+s.sendSynthDef(\cf4 "fm"\cf0 );\
+s.sendSynthDef(\cf4 "carrier"\cf0 );\
+s.sendSynthDef(\cf4 "line"\cf0 );\
+)\
+\
+x = \cf3 Synth\cf0 .head(s, \cf4 "fm"\cf0 );\
+y = \cf3 Synth\cf0 .tail(s, \cf4 "carrier"\cf0 );\
+z = \cf3 Synth\cf0 .head(s, \cf4 "line"\cf0 , [\cf4 "start"\cf0 , -1, \cf4 "end"\cf0 , 0, \cf4 "time"\cf0 , 5, \cf4 "outbus"\cf0 , 103]);\
+y.set("freq", 220);\
+y.set(\cf4 "shape"\cf0 , 1); \cf2 // change to Saw wave\cf0 \
+y.set(\cf4 "shape"\cf0 , 0); \cf2 // change back to Sine wave\cf0 \
+\
+\cf2 // You can make as many of the line synths as you like, \cf0 \
+\cf2 // all going to different busses\cf0 \
+\
+(\
+z = \cf3 Synth\cf0 .head(s, \cf4 "line"\cf0 , [\cf4 "start"\cf0 , -1, \cf4 "end"\cf0 , 0, \cf4 "time"\cf0 , 2, \cf4 "outbus"\cf0 , 103]);\
+v = \cf3 Synth\cf0 .head(s, \cf4 "line"\cf0 , [\cf4 "start"\cf0 , 60, \cf4 "end"\cf0 , 150, \cf4 "time"\cf0 , 7, \cf4 "outbus"\cf0 , 101]);\
+w = \cf3 Synth\cf0 .head(s, \cf4 "line"\cf0 , [\cf4 "start"\cf0 , 1, \cf4 "end"\cf0 , 80, \cf4 "time"\cf0 , 10, \cf4 "outbus"\cf0 , 102]);\
+)\
+(\
+z = \cf3 Synth\cf0 .head(s, \cf4 "line"\cf0 , [\cf4 "start"\cf0 , 0, \cf4 "end"\cf0 , -1, \cf4 "time"\cf0 , 10, \cf4 "outbus"\cf0 , 103]);\
+v = \cf3 Synth\cf0 .head(s, \cf4 "line"\cf0 , [\cf4 "start"\cf0 , 150, \cf4 "end"\cf0 , 5, \cf4 "time"\cf0 , 7, \cf4 "outbus"\cf0 , 101]);\
+w = \cf3 Synth\cf0 .head(s, \cf4 "line"\cf0 , [\cf4 "start"\cf0 , 80, \cf4 "end"\cf0 , 30, \cf4 "time"\cf0 , 5, \cf4 "outbus"\cf0 , 102]);\
+)\
+\
+\cf2 // More fun with Select: using it as a very basic sequencer, \cf0 \
+\cf2 // triggered using a low frequency saw wave\
+\cf0 \
+(\
+\cf3 SynthDef\cf0 (\cf4 "sequence"\cf0 , \{ \cf3 arg\cf0  speed=0.5, outbus=101;\
+\cf3 var\cf0  sequence, trig;\
+trig = \cf3 LFSaw\cf0 .kr(speed, 0, 4, 4);\
+sequence = \cf3 Select\cf0 .kr(trig, [5,100,30,45,29,85,93,5]);\
+\cf3 Out\cf0 .kr(outbus, sequence);\
+\}).writeDefFile;\
+)\
+s.sendSynthDef(\cf4 "sequence"\cf0 );\
+\
+u = \cf3 Synth\cf0 .head(s, \cf4 "sequence"\cf0 );\
+u.set(\cf4 "speed"\cf0 , 0.5);\
+\
+u.free;\
+x.free;\
+y.free;\
+\
+\cf2 // OK, so we have moved on to something which sounds slightly more \cf0 \
+\cf2 // interesting than a 440Hz sine tone! Now for some GUI action...}
